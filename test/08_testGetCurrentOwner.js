@@ -1,5 +1,5 @@
 const catchRevert = require("./helpers/exceptionHelpers.js");
-const test_data = require("./0_test_data.js").test_data;
+const test_params = require("./0_test_data.js");
 
 const ArtGallery = artifacts.require("ArtGallery");
 
@@ -15,7 +15,8 @@ contract("Test GetCurrentOwner", (accounts) => {
 
     
     it('Art work get current owner', async()=>{
-        var artwork_data = await test_data();
+        var artwork_data = await test_params.test_data();
+        var showBusinessList = await test_params.showBusinessList();
         
         
         for(var x=0; x<artwork_data.length; x++){
@@ -36,11 +37,11 @@ contract("Test GetCurrentOwner", (accounts) => {
         var result = await artGallery.buyArtwork(artwork_data[0].code, { from: customerAccount, value: artwork_data[0].price });    
 
         /* Check the current owner */
-        var mov = await artGallery.getLastOperation(artwork_data[0].code, { from: customerAccount, value: 0 });
-        if(mov.to == customerAccount){
+        var mov = await artGallery.getLastBusiness(artwork_data[0].code, { from: customerAccount, value: 0 });
+        if(mov.owner == customerAccount){
             console.log("Test passed: current-owner")
         }        
-        assert(mov.to == customerAccount, "The artwork is not for the right owner");
+        assert(mov.owner == customerAccount, "The artwork is not for the right owner");
 
 
 

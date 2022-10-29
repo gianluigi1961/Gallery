@@ -1,5 +1,5 @@
 const catchRevert = require("./helpers/exceptionHelpers.js");
-const test_data = require("./0_test_data.js").test_data;
+const test_params = require("./0_test_data.js");
 
 const ArtGallery = artifacts.require("ArtGallery");
 
@@ -15,7 +15,8 @@ contract("Test ChangeSalePriceArtwork", (accounts) => {
 
     
     it('Art work change sale price', async()=>{
-        var artwork_data = await test_data();
+        var artwork_data = await test_params.test_data();
+        var showBusinessList = await test_params.showBusinessList();
         
         
         for(var x=0; x<artwork_data.length; x++){
@@ -46,29 +47,28 @@ contract("Test ChangeSalePriceArtwork", (accounts) => {
         //the current customer put the artwork for sale
         await artGallery.putForSale(artwork_data[0].code, price, { from: customerAccount, value: 0 });  
 
-        var lista_before = await artGallery.getMovementList(artwork_data[0].code, { from: deployAccount, value: 0 });        
-        console.log(lista_before);
-        
+        if(showBusinessList){
+            var lista_before = await artGallery.getBusinessList(artwork_data[0].code, { from: deployAccount, value: 0 });        
+            console.log(lista_before);
+        }
+
         var new_price = '950000000000000000';
         await artGallery.changeSalePrice(artwork_data[0].code, new_price, { from: customerAccount, value: 0 })
 
-       
-        console.log("====================");
+        if(showBusinessList){
+            console.log("====================");
 
-        var lista_after = await artGallery.getMovementList(artwork_data[0].code, { from: deployAccount, value: 0 });        
-        console.log(lista_after);
+            var lista_after = await artGallery.getBusinessList(artwork_data[0].code, { from: deployAccount, value: 0 });        
+            console.log(lista_after);
+        }
 
-        var mov = await artGallery.getLastOperation(artwork_data[0].code, { from: customerAccount, value: 0 });
+        var mov = await artGallery.getLastBusiness(artwork_data[0].code, { from: customerAccount, value: 0 });
         if(parseFloat(mov.price) == parseFloat(new_price)){
             console.log("Test passed: put-for-sale-price")
         }        
         assert(parseFloat(mov.price) == parseFloat(new_price), "The artwork is not for sale on the right price");
         
-        
-
-
-
-        
+                
 
     })
     

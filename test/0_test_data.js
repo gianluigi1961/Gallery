@@ -1,6 +1,9 @@
 
 
 module.exports = {
+    showBusinessList : async () =>{
+        return false;
+    },
     test_data : async (promise) => {
             var data = [
                 {code : 'artwork-1', price:'500000000000000000', fee:12 },

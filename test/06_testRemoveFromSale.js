@@ -1,5 +1,5 @@
 const catchRevert = require("./helpers/exceptionHelpers.js");
-const test_data = require("./0_test_data.js").test_data;
+const test_params = require("./0_test_data.js");
 
 const ArtGallery = artifacts.require("ArtGallery");
 
@@ -15,7 +15,8 @@ contract("Test RemoveFromSaleArtwork", (accounts) => {
 
     
     it('Art work remove from sale', async()=>{
-        var artwork_data = await test_data();
+        var artwork_data = await test_params.test_data();
+        var showBusinessList = await test_params.showBusinessList();
         
         
         for(var x=0; x<artwork_data.length; x++){
@@ -37,34 +38,37 @@ contract("Test RemoveFromSaleArtwork", (accounts) => {
         var price = "600000000000000000";
         await artGallery.putForSale(artwork_data[0].code, price, { from: customerAccount, value: 0 })
         
-        var lista_before = await artGallery.getMovementList(artwork_data[0].code, { from: deployAccount, value: 0 });        
-        console.log(lista_before);
+        if(showBusinessList){
+            var lista_before = await artGallery.getBusinessList(artwork_data[0].code, { from: deployAccount, value: 0 });        
+            console.log(lista_before);
+        }
 
         var result = await catchRevert.currentOwner(artGallery.removeFromSale(artwork_data[0].code, { from: customerAccount_2, value: 0 }));        
         assert(result, "The current owner has not been detected");
 
-
         await artGallery.removeFromSale(artwork_data[0].code, { from: customerAccount, value: 0 })
-        
-        console.log("====================");
 
-        var lista_after = await artGallery.getMovementList(artwork_data[0].code, { from: deployAccount, value: 0 });        
-        console.log(lista_after);
+        if(showBusinessList){
+            console.log("====================");
 
-        var mov_after = await artGallery.getLastOperation(artwork_data[0].code, { from: customerAccount, value: 0 });
-        if(mov_after.to == customerAccount){
+            var lista_after = await artGallery.getBusinessList(artwork_data[0].code, { from: deployAccount, value: 0 });        
+            console.log(lista_after);
+        }
+
+        var mov_after = await artGallery.getLastBusiness(artwork_data[0].code, { from: customerAccount, value: 0 });
+        if(mov_after.owner == customerAccount){
             console.log("Test passed: remove-from-sale-owner")
         }                  
         if(mov_after.operation == 2){
             console.log("Test passed: remove-from-sale-operation")
         }           
-        assert(mov_after.to == customerAccount, "The artwork is not on the right account");
+        assert(mov_after.owner == customerAccount, "The artwork is not on the right account");
         
 
         //Movement list
         /*
         for(var x=0; x<artwork_data.length; x++){
-            var lista = await artGallery.getMovementList(artwork_data[x].code, { from: deployAccount, value: 0 });
+            var lista = await artGallery.getBusinessList(artwork_data[x].code, { from: deployAccount, value: 0 });
             console.log(artwork_data[x].code);
             console.log(lista);
             console.log("---------");

@@ -3,9 +3,7 @@ pragma solidity ^0.8.0;
 
 import "../node_modules/@openzeppelin/contracts/access/Ownable.sol";
 import "../node_modules/@openzeppelin/contracts/utils/Address.sol";
-import "../Model/Enum.sol";
-import "../Model/Artwork.sol";
-import "../Model/Business.sol";
+
 
 
 
@@ -17,7 +15,56 @@ ArtGallery SmartContract
 - Customers can put the purchased works of art on sale and in case of sale the art gallery retains the fees
 */
 contract ArtGallery is Ownable{    
-                            
+              
+    enum en_Operation{
+        Enter,
+        ForSale, 
+        Purchase
+    }
+
+    /*
+    *   
+    */
+    struct Artwork {        
+        /*
+        *   The fees that the contract retains for each sale
+        */
+        uint percFee;
+
+        /*
+        *   Need to understand if an Artwork exixts in the Mapping
+        */
+        bool exists;      
+    }
+
+    /*
+    *   Defines the list of purchase or sale transactions
+    *   The smart Contract create a new Business element every time 
+    *   the owner changes the state of the artwork and evry time it is sold
+    */
+    struct Business {
+        
+        /*
+        *   The new Owner of the Artwork
+        */
+        address owner;
+
+        /*
+        *   The price of the operation
+        */
+        uint price;
+
+        /*
+        *   The operation type
+        *   Created every time the Owner change the Art work status 
+        *   and/or price and every time an Artwork is sold
+        *   Define the current status of the Artwork, Purchased or ForSale
+        */
+        en_Operation operation;
+    }
+
+
+
     /* Contract Data */ 
     mapping(string => Artwork) artworks;
     mapping(string => Business[]) business;
@@ -37,8 +84,6 @@ contract ArtGallery is Ownable{
     event ChangeArtworkPriceEvent(string code, uint price);
 
     
-
-    
     /*
     *    The Contract owner insert the Artwork
     *
@@ -50,25 +95,24 @@ contract ArtGallery is Ownable{
     * 
     *   Emits a {AddArtworkEvent} event.
     */
-    function addArtwork(string calldata _code, uint _price, uint _percFee) 
+    function addArtwork(string memory _code, uint _price, uint _percFee) 
                         public 
                         onlyOwner
                         stringNotVoid(_code)
                         artworkNotExists(_code) 
                         valueNotZero(_price, "The price is required") {
                 
-        Artwork memory prod;
-        prod.percFee = _percFee;        
-        prod.exists = true;
+        Artwork memory product;
+        product.percFee = _percFee;        
+        product.exists = true;
         
-        Business memory mov;            
-        mov.from = msg.sender;
-        mov.to = msg.sender;
-        mov.price = _price;
-        mov.operation = en_Operation.Enter;
+        Business memory newBusiness;                    
+        newBusiness.owner = msg.sender;
+        newBusiness.price = _price;
+        newBusiness.operation = en_Operation.Enter;
 
-        artworks[_code] = prod;        
-        business[_code].push(mov);
+        artworks[_code] = product;        
+        business[_code].push(newBusiness);
         
         emit AddArtworkEvent(_code, _price);
     }
@@ -82,7 +126,7 @@ contract ArtGallery is Ownable{
     * 
     *   Emits a {RemoveArtworkEvent} event.              
     */
-    function removeArtwork(string calldata _code) 
+    function removeArtwork(string memory _code) 
                             public 
                             onlyOwner 
                             stringNotVoid(_code)
@@ -97,9 +141,6 @@ contract ArtGallery is Ownable{
         
         return artworks[_code].exists && business[_code].length > 0;
     }
-
-
-    
 
     /*
     *   Buy a product, the product must be for sale
@@ -119,42 +160,42 @@ contract ArtGallery is Ownable{
                     senderIsNotArtworkOwner(_code)
                     artworkIsForSale(_code)
                     returns(bool){
-                     
+
+        //The amouint to send to the current Artwork Owner 
+        //in case is not the constract Owner
         uint amountToPay;
-        Business memory mov = getLastOperation(_code);
-        
-        /* Check the last operation is not a Purchase */
-        //require(mov.operation != en_Operation.Purchase, "The artwork is not for sale");
+
+        Business memory lastBusiness = getLastBusiness(_code);
+                
         /* Check the send amount is equals to the Artwork price */
-        require(mov.price == msg.value, "#valid-price# - The price is not valid");
+        require(lastBusiness.price == msg.value, "#valid-price# - The price is not valid");
 
         //I am doing a resale for which i have to send
         //payment to the owner minus the fees
-        if(mov.from != owner()){
-            Artwork memory prod = artworks[_code];
-            if(prod.percFee > 0){
-                amountToPay = msg.value - (msg.value / 100 * prod.percFee);
-                Address.sendValue(payable(mov.from), amountToPay);            
+        if(lastBusiness.owner != owner()){
+            Artwork memory product = artworks[_code];
+            if(product.percFee > 0){
+                amountToPay = msg.value - (msg.value / 100 * product.percFee);
+                Address.sendValue(payable(lastBusiness.owner), amountToPay);            
             }
         }
 
         /* Create a new Purchase operation - Change the Artwork Owner */
-        Business memory new_mov;
-        new_mov.from = mov.to;
-        new_mov.to = msg.sender;
-        new_mov.price = msg.value;
-        new_mov.operation = en_Operation.Purchase;
-        business[_code].push(new_mov);
+        Business memory newbusiness;        
+        newbusiness.owner = msg.sender;
+        newbusiness.price = msg.value;
+        newbusiness.operation = en_Operation.Purchase;
+        business[_code].push(newbusiness);
 
         emit BuyEvent(_code, msg.value, msg.sender);
 
-        if(mov.from != owner()){
-            emit SendPaymentEvent(_code, amountToPay, mov.from);
+        if(lastBusiness.owner != owner()){
+            emit SendPaymentEvent(_code, amountToPay, lastBusiness.owner);
         }
         
         unchecked {
             totalSold += msg.value;
-            if(mov.from != owner()){
+            if(lastBusiness.owner != owner()){
                 totalFeeSold += (msg.value - amountToPay);            
             }else{
                 totalDirectSold += msg.value;
@@ -183,12 +224,11 @@ contract ArtGallery is Ownable{
                         artworkIsNotForSale(_code) 
                         returns(bool){
         
-        Business memory new_mov;
-        new_mov.from = msg.sender;
-        new_mov.to = msg.sender;
-        new_mov.price = _price;
-        new_mov.operation = en_Operation.ForSale;
-        business[_code].push(new_mov);
+        Business memory newBusiness;        
+        newBusiness.owner = msg.sender;
+        newBusiness.price = _price;
+        newBusiness.operation = en_Operation.ForSale;
+        business[_code].push(newBusiness);
 
         emit PutArtworkForSaleEvent(_code, _price);
 
@@ -212,8 +252,8 @@ contract ArtGallery is Ownable{
                             artworkIsForSale(_code)
                             returns(bool){
                        
-        Business memory mov = getLastOperation(_code);
-        require(mov.to != owner(), "#cannot-remove# - The contract owner cannot remove artwork from sale, remove the Artwork instead");
+        Business memory lastBusiness = getLastBusiness(_code);
+        require(lastBusiness.owner != owner(), "#cannot-remove# - The contract owner cannot remove artwork from sale, remove the Artwork instead");
 
         /* Remove the last element in the business array */
         business[_code].pop();
@@ -251,7 +291,6 @@ contract ArtGallery is Ownable{
         return true;
     }
 
-
     /*
     *   The current Owner of the Artwork by code
     *
@@ -266,7 +305,7 @@ contract ArtGallery is Ownable{
                                 artworkExists(_code) 
                                 returns(address){
 
-        return getLastOperation(_code).to;
+        return getLastBusiness(_code).owner;
     }
 
     /*
@@ -276,19 +315,19 @@ contract ArtGallery is Ownable{
     * 
     *   - `_code` : the Artwork code
     */
-    function getMovementList(string memory _code) 
+    function getBusinessList(string memory _code) 
                             public 
                             view 
                             onlyOwner
                             stringNotVoid(_code)
                             artworkExists(_code) 
                             returns(Business[] memory){
-        Business[] memory lista = new Business[](business[_code].length);
+        Business[] memory businessList = new Business[](business[_code].length);
         
         for(uint x=0; x<business[_code].length; x++){            
-            lista[x] = business[_code][x];            
+            businessList[x] = business[_code][x];            
         }
-        return lista;                
+        return businessList;                
     }
 
     /* 
@@ -308,7 +347,6 @@ contract ArtGallery is Ownable{
 
         return (totalSold, totalDirectSold, totalFeeSold, address(this).balance);
     }
-
     
     /*
     function getAddress() public view returns(address){
@@ -324,25 +362,18 @@ contract ArtGallery is Ownable{
     *   - `_to` : address to send the money to         
     *   - `_amount` : amount to withdraw
     */
-    function withdraw(address payable _to, uint _amount) 
+    function withdraw(uint _amount) 
                         public 
                         payable 
                         onlyOwner 
                         valueNotZero(_amount, "The amount of the withdraw is required") {        
-        require(_to != address(0), "Cannot withdraw to zero address");
-        require(_to != address(this), "Cannot withdraw to this smart contract address");
                 
         uint balance = address(this).balance;
         require(balance > 0, "#balance-zero# The balance is zero");
         require(_amount <= balance, "#amount-exceed-balance# - The amount cannot exceed the balance");
         
-        Address.sendValue(_to, _amount);        
+        Address.sendValue(payable(owner()), _amount);        
     }
-
-
-
-
-
 
     /********************
         Private functions
@@ -355,7 +386,7 @@ contract ArtGallery is Ownable{
     *   - `_code` :    the code of the artwork
     * 
     */
-    function getLastOperation(string memory _code) 
+    function getLastBusiness(string memory _code) 
                                 public 
                                 view                                                                
                                 returns(Business memory){
@@ -387,26 +418,28 @@ contract ArtGallery is Ownable{
     }
 
     modifier senderIsArtworkOwner(string memory _code) {                
-        Business memory mov = getLastOperation(_code);        
-        require(mov.to == msg.sender, string.concat("#current-owner# - You are not the current artwork ", _code, " owner"));
+        Business memory lastBusiness = getLastBusiness(_code);        
+        require(lastBusiness.owner == msg.sender, string.concat("#current-owner# - You are not the current artwork ", _code, " owner"));
         _;
     }
 
     modifier senderIsNotArtworkOwner(string memory _code) {                
-        Business memory mov = getLastOperation(_code);   
-        require(mov.to != msg.sender, string.concat("#not-current-owner# - You are the current artwork ", _code, " owner"));
+        Business memory lastBusiness = getLastBusiness(_code);   
+        require(lastBusiness.owner != msg.sender, string.concat("#not-current-owner# - You are the current artwork ", _code, " owner"));
         _;
     }
 
     modifier artworkIsForSale(string memory _code) {                
-        Business memory mov = getLastOperation(_code);        
-        require(mov.operation == en_Operation.Enter || mov.operation == en_Operation.ForSale, string.concat("#for-sale# - The artwork ", _code, " is not for sale"));
+        Business memory lastBusiness = getLastBusiness(_code);        
+        require(lastBusiness.operation == en_Operation.Enter || 
+                lastBusiness.operation == en_Operation.ForSale, 
+                string.concat("#for-sale# - The artwork ", _code, " is not for sale"));
         _;
     }
 
     modifier artworkIsNotForSale(string memory _code) {                
-        Business memory mov = getLastOperation(_code);        
-        require(mov.operation == en_Operation.Purchase, string.concat("#not-for-sale# - The artwork ", _code, " is for sale"));
+        Business memory lastBusiness = getLastBusiness(_code);        
+        require(lastBusiness.operation == en_Operation.Purchase, string.concat("#not-for-sale# - The artwork ", _code, " is for sale"));
         _;
     }
 

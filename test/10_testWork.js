@@ -1,5 +1,6 @@
 const catchRevert = require("./helpers/exceptionHelpers.js");
-const test_data = require("./0_test_data.js").test_data;
+const test_params = require("./0_test_data.js");
+const ethers = require("ethers");
 
 const ArtGallery = artifacts.require("ArtGallery");
 
@@ -16,8 +17,8 @@ contract("Test Gallery", (accounts) => {
 
     
     it('Gallery working', async()=>{
-        var artwork_data = await test_data();
-        
+        var artwork_data = await test_params.test_data();
+        var showBusinessList = await test_params.showBusinessList();        
         
         for(var x=0; x<artwork_data.length; x++){
             await artGallery.addArtwork(artwork_data[x].code, artwork_data[x].price, artwork_data[x].fee, { from: deployAccount, value: 0 })            
@@ -26,10 +27,10 @@ contract("Test Gallery", (accounts) => {
           
         //Buy one Artwork - need to verify if the owner can remote it after sale        
         await artGallery.buyArtwork(artwork_data[0].code, { from: customerAccount_1, value: artwork_data[0].price })
-        console.log("Test passed: But artwork 1");
+        console.log("Test passed: Buy artwork 1");
 
         await artGallery.buyArtwork(artwork_data[1].code, { from: customerAccount_2, value: artwork_data[1].price })
-        console.log("Test passed: But artwork 2");
+        console.log("Test passed: Buy artwork 2");
 
         //put for sale
         var price_1 = "600000000000000000";                     
@@ -47,20 +48,23 @@ contract("Test Gallery", (accounts) => {
         console.log("Test passed: Re-Buy artwork 2");
 
         //Movement list
-        for(var x=0; x<artwork_data.length; x++){
-            var lista = await artGallery.getMovementList(artwork_data[x].code, { from: deployAccount, value: 0 });
-            console.log(artwork_data[x].code);
-            console.log(lista);
-            console.log("---------");
+        if(showBusinessList){
+            for(var x=0; x<artwork_data.length; x++){
+                var lista = await artGallery.getBusinessList(artwork_data[x].code, { from: deployAccount, value: 0 });
+                console.log(artwork_data[x].code);
+                console.log(lista);
+                console.log("---------");
+            }
         }
 
 
         //contract balance
-        var result = await artGallery.getBalance({ from: deployAccount, value: 0 });                                             
-        console.log("Current contract balance: " + parseFloat(result[3]));
-        console.log("Total sold: " + parseFloat(result[0]));
-        console.log("Total direct sold: " + parseFloat(result[1]));
-        console.log("Total Fee: " + parseFloat(result[2]));
+        var result = await artGallery.getBalance({ from: deployAccount, value: 0 });   
+        //console.log(result);                                          
+        console.log("Current contract balance: " + ethers.utils.formatEther(result[3].toString()));
+        console.log("Total sold: " + ethers.utils.formatEther(result[0].toString()));
+        console.log("Total direct sold: " + ethers.utils.formatEther(result[1].toString()));
+        console.log("Total Fee: " + ethers.utils.formatEther(result[2].toString()));
         console.log("---------");
 
     })
