@@ -358,8 +358,7 @@ contract ArtGallery is Ownable{
     *   Owner can withdraw Contract balance
     *
     *   Requirements:
-    * 
-    *   - `_to` : address to send the money to         
+    *     
     *   - `_amount` : amount to withdraw
     */
     function withdraw(uint _amount) 
