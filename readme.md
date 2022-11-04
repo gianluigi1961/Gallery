@@ -4,6 +4,8 @@
 > We simulate an art gallery that sells its works of art<br>
 > Customers can put the purchased works of art on sale and in case of sale the art gallery retains the fees<br>
 
+Etherscan url:<br>
+https://goerli.etherscan.io/address/0xE6CB8Df626b9c0CA9E5b37431e48f25F3aFD00f5#code<br><br>
 
 
 ## Struct<br>
